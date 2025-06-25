@@ -1,0 +1,26 @@
+	package models
+
+import (
+	"github.com/google/uuid"
+	"time"
+)
+
+type AnnoncePrefinancement struct {
+	ID             uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	UserID         uuid.UUID `json:"user_id" gorm:"type:uuid"`
+	TypeCultureID  uuid.UUID `json:"type_culture_id" gorm:"type:uuid"`
+	ParcelleID     uuid.UUID `json:"parcelle_id" gorm:"type:uuid"`
+	Statut         string    `json:"statut"`
+	Description       int       `json:"description"`
+	Montant       int       `json:"montant_pref"`
+	CreatedAt time.Time `json:"créé_a"`
+	// UpdatedAt time.Time `json:"updated_at"`
+
+	// CreatedAt omitted for now
+}
+
+func (AnnoncePrefinancement) TableName() string {
+	return "annoncePrefinancement"
+}
+
+
