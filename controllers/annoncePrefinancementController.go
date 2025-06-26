@@ -41,6 +41,26 @@ func GetAllAnnoncePref(c *gin.Context) {
 	c.JSON(http.StatusOK, prefinancements)
 }
 
+
+// 🔹 Récupérer toutes les annonces de préfinancement d’un utilisateur
+func GetPrefinancementsByUserID(c *gin.Context) {
+	userIDParam := c.Param("user_id")
+	userID, err := uuid.Parse(userIDParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID utilisateur invalide"})
+		return
+	}
+
+	var annonces []models.AnnoncePrefinancement
+	if err := database.DB.Where("user_id = ?", userID).Find(&annonces).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la récupération : " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, annonces)
+}
+
+
 // Créer une nouvelle annonce_achat
 func CreateAnnoncePref(c *gin.Context) {
 	var prefinancements models.AnnoncePrefinancement

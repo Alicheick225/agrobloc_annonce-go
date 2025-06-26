@@ -41,6 +41,27 @@ func GetAllAnnonceAchat(c *gin.Context) {
 	c.JSON(http.StatusOK, achats)
 }
 
+// 🔹 Afficher toutes les annonces d'achat d'un utilisateur
+func GetAnnoncesAchatByUserID(c *gin.Context) {
+	userIDParam := c.Param("user_id")
+
+	// Vérifier que c’est un UUID valide
+	userID, err := uuid.Parse(userIDParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID utilisateur invalide"})
+		return
+	}
+
+	var annonces []models.AnnonceAchat
+	if err := database.DB.Where("user_id = ?", userID).Find(&annonces).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la récupération des annonces : " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, annonces)
+}
+
+
 
 //Créer une nouvelle annonce_achat
 func CreateAnnonceAchat(c *gin.Context) {

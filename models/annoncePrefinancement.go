@@ -1,19 +1,20 @@
-	package models
+package models
 
 import (
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type AnnoncePrefinancement struct {
-	ID             uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
-	UserID         uuid.UUID `json:"user_id" gorm:"type:uuid"`
-	TypeCultureID  uuid.UUID `json:"type_culture_id" gorm:"type:uuid"`
-	ParcelleID     uuid.UUID `json:"parcelle_id" gorm:"type:uuid"`
-	Statut         string    `json:"statut"`
-	Description       int       `json:"description"`
-	Montant       int       `json:"montant_pref"`
-	CreatedAt time.Time `json:"créé_a"`
+	ID            uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	UserID        uuid.UUID `json:"user_id" gorm:"type:uuid"`
+	TypeCultureID uuid.UUID `json:"type_culture_id" gorm:"type:uuid"`
+	ParcelleID    uuid.UUID `json:"parcelle_id" gorm:"type:uuid"`
+	Statut        string    `json:"status" gorm:"column:status"`
+	Description   string    `json:"description"`
+	Montant       int       `json:"montant"`
+	CreatedAt     time.Time `json:"created_at"`
 	// UpdatedAt time.Time `json:"updated_at"`
 
 	// CreatedAt omitted for now
@@ -22,5 +23,3 @@ type AnnoncePrefinancement struct {
 func (AnnoncePrefinancement) TableName() string {
 	return "annonces_prefinancement"
 }
-
-
