@@ -10,6 +10,7 @@ type AnnonceAchat struct {
 	UserID         uuid.UUID `json:"user_id" gorm:"type:uuid"`
 	TypeCultureID  uuid.UUID `json:"type_culture_id" gorm:"type:uuid"`
 	Statut         string    `json:"statut"`
+	Description    string    `json:"description"`
 	Quantite       int       `json:"quantite"`
 	CreatedAt time.Time `json:"créé_a"`
 	// UpdatedAt time.Time `json:"updated_at"`

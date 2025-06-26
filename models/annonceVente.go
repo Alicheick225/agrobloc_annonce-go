@@ -13,6 +13,7 @@ type AnnonceVente struct {
 	ParcelleID    uuid.UUID `json:"parcelle_id" gorm:"type:uuid"`
 	Photo         string    `json:"photo"`
 	Statut        string    `json:"statut"`
+	Description   string    `json:"description"`
 	Quantite      int       `json:"quantite"`
 	PrixKg        float64   `json:"prix_kg"`
 	CreatedAt     time.Time `json:"créé_a"`
