@@ -20,7 +20,7 @@ type AnnoncePrefinancement struct {
 }
 
 func (AnnoncePrefinancement) TableName() string {
-	return "annoncePrefinancement"
+	return "annonces_prefinancement"
 }
 
 

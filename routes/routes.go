@@ -19,7 +19,7 @@ func SetupRoutes() *gin.Engine {
 	r.GET("/annonces_achat", controllers.GetAllAnnonceAchat)
 	r.POST("/annonces_achat", controllers.CreateAnnonceAchat)
 	r.GET("/annonces_achat/:id", controllers.GetAnnonceAchatByID)
-	r.PUT("/annonces_acht/:id", controllers.UpdateAnnonceAchat)
+	r.PUT("/annonces_achat/:id", controllers.UpdateAnnonceAchat)
 	r.DELETE("/annonces_achat/:id", controllers.DeleteAnnonceAchat)
 
 

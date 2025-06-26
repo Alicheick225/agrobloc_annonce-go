@@ -19,7 +19,7 @@ func InitDB() {
 		log.Fatal("Erreur de chargement du fichier .env")
 	}
 
-	// Récupération des valeurs
+	// Récupération des valeurs d’environnement
 	DB_HOST := os.Getenv("host")
 	DB_PORT := os.Getenv("port")
 	DB_USER := os.Getenv("user")
@@ -27,11 +27,15 @@ func InitDB() {
 	DB_NAME := os.Getenv("dbname")
 
 	// Chaîne de connexion PostgreSQL
-	conn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME)
 
-	// Connexion à la base de données
-	DB, err = gorm.Open(postgres.Open(conn), &gorm.Config{})
+	// Connexion avec désactivation du protocole préparé
+	DB, err = gorm.Open(postgres.New(postgres.Config{
+		DSN:                  dsn,
+		PreferSimpleProtocol: true, // ✅ IMPORTANT : désactive les requêtes préparées
+	}), &gorm.Config{})
+
 	if err != nil {
 		log.Fatal("Erreur de connexion à la base de données :", err)
 	}

@@ -18,6 +18,6 @@ type AnnonceAchat struct {
 }
 
 func (AnnonceAchat) TableName() string {
-	return "annonceAchat"
+	return "annonces_achat"
 }
 
