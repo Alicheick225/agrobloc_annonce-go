@@ -8,7 +8,6 @@ import (
 
 func SetupRoutes() *gin.Engine {
 	r := gin.Default()
-
 	r.GET("/annonces_vente", controllers.GetAllAnnonceVente)
 	r.POST("/annonces_vente", controllers.CreateAnnonceVente)
 	r.GET("/annonces_vente/:id", controllers.GetAnnonceByID)

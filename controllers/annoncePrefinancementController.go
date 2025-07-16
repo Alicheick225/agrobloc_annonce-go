@@ -2,47 +2,147 @@ package controllers
 
 import (
 	"net/http"
-
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	"strconv"
 
 	"github.com/Steph-business/annonce_de_vente/database"
 	"github.com/Steph-business/annonce_de_vente/models"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
-// Liste toutes les annonces avec filtres facultatifs
+// 🔹 Lister toutes les annonces de préfinancement avec relations
 func GetAllAnnoncePref(c *gin.Context) {
-	var prefinancements []models.AnnoncePrefinancement
+	var annonces []models.AnnoncePrefinancement
+	query := database.DB.Preload("User").Preload("TypeCulture").Preload("Parcelle")
 
-	// Récupérer les filtres
-	userID := c.Query("user_id")
-	statut := c.Query("statut")
-	typeCultureID := c.Query("type_culture_id")
-
-	// Construire la requête dynamique
-	query := database.DB
-
-	if userID != "" {
+	// Filtres facultatifs
+	if userID := c.Query("user_id"); userID != "" {
 		query = query.Where("user_id = ?", userID)
 	}
-	if statut != "" {
+	if statut := c.Query("statut"); statut != "" {
 		query = query.Where("statut = ?", statut)
 	}
-	if typeCultureID != "" {
+	if typeCultureID := c.Query("type_culture_id"); typeCultureID != "" {
 		query = query.Where("type_culture_id = ?", typeCultureID)
 	}
 
-	// Exécuter la requête
-	if err := query.Find(&prefinancements).Error; err != nil {
+	// ❗ Cette ligne manquait !
+	if err := query.Find(&annonces).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, prefinancements)
+	var result []models.LiteAnnoncePrefinancement
+	for _, a := range annonces {
+		result = append(result, models.LiteAnnoncePrefinancement{
+			ID:                 a.ID.String(),
+			Statut:             a.Statut,
+			Description:        a.Description,
+			MontantPref:        a.MontantPrefinancement,
+			PrixKgPref:         a.Prix,
+			Quantite:           a.Quantite,
+			UserNom:            a.User.Nom,
+			TypeCultureLibelle: a.TypeCulture.Libelle,
+			ParcelleAdresse:    a.Parcelle.Adresse,
+			ParcelleSuf:        a.Parcelle.Surface,
+		})
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
+// 🔹 Créer une nouvelle annonce de préfinancement
+func CreateAnnoncePref(c *gin.Context) {
+	var annonce models.AnnoncePrefinancement
 
-// 🔹 Récupérer toutes les annonces de préfinancement d’un utilisateur
+	// ✅ Récupération et validation des champs texte
+	annonce.Statut = c.PostForm("statut")
+	annonce.Description = c.PostForm("description")
+
+	// ✅ Parsing et validation des UUID
+	userID, err := uuid.Parse(c.PostForm("user_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID utilisateur invalide"})
+		return
+	}
+	typeCultureID, err := uuid.Parse(c.PostForm("type_culture_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID type culture invalide"})
+		return
+	}
+	parcelleID, err := uuid.Parse(c.PostForm("parcelle_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID parcelle invalide"})
+		return
+	}
+	annonce.UserID = userID
+	annonce.TypeCultureID = typeCultureID
+	annonce.ParcelleID = parcelleID
+
+	// ✅ Vérification existence des entités liées
+	var tc models.TypeCulture
+	if err := database.DB.First(&tc, "id = ?", typeCultureID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Type de culture introuvable"})
+		return
+	}
+	var parcelle models.Parcelle
+	if err := database.DB.First(&parcelle, "id = ?", parcelleID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Parcelle introuvable"})
+		return
+	}
+	var user models.User
+	if err := database.DB.First(&user, "id = ?", userID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Utilisateur introuvable"})
+		return
+	}
+
+	// ✅ Conversion des nombres
+	qStr := c.PostForm("quantite")
+	pStr := c.PostForm("prix")
+	quantite, err := strconv.ParseFloat(qStr, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Quantité invalide"})
+		return
+	}
+	prix, err := strconv.ParseFloat(pStr, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Prix invalide"})
+		return
+	}
+	annonce.Quantite = quantite
+	annonce.Prix = prix
+	annonce.MontantPrefinancement = prix * quantite
+
+	// ✅ Génération de l’UUID
+	annonce.ID = uuid.New()
+
+	// ✅ Enregistrement
+	if err := database.DB.Create(&annonce).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur création : " + err.Error()})
+		return
+	}
+
+	// ✅ Préchargement avec les relations
+	database.DB.Preload("User").Preload("Parcelle").Preload("TypeCulture").First(&annonce)
+
+	// ✅ Retour
+	result := models.LiteAnnoncePrefinancement{
+		ID:                 annonce.ID.String(),
+		Statut:             annonce.Statut,
+		Description:        annonce.Description,
+		MontantPref:        annonce.MontantPrefinancement,
+		PrixKgPref:         annonce.Prix,
+		Quantite:           annonce.Quantite,
+		UserNom:            user.Nom,
+		TypeCultureLibelle: tc.Libelle,
+		ParcelleAdresse:    parcelle.Adresse,
+		ParcelleSuf:        parcelle.Surface,
+	}
+
+	c.JSON(http.StatusCreated, result)
+}
+
+// Récupérer les annonces d’un utilisateur
 func GetPrefinancementsByUserID(c *gin.Context) {
 	userIDParam := c.Param("user_id")
 	userID, err := uuid.Parse(userIDParam)
@@ -60,27 +160,7 @@ func GetPrefinancementsByUserID(c *gin.Context) {
 	c.JSON(http.StatusOK, annonces)
 }
 
-
-// Créer une nouvelle annonce_achat
-func CreateAnnoncePref(c *gin.Context) {
-	var prefinancements models.AnnoncePrefinancement
-	if err := c.ShouldBindJSON(&prefinancements); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Soumission invalide : " + err.Error()})
-		return
-	}
-
-	// Assigner un ID unique si nécessaire
-	prefinancements.ID = uuid.New()
-
-	if err := database.DB.Create(&prefinancements).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur création : " + err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusCreated, prefinancements)
-}
-
-// Récupération d'une annonce par son Identifiant
+// 🔹 Récupérer une annonce par ID
 func GetAnnoncePrefByID(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := uuid.Parse(idParam)
@@ -89,16 +169,29 @@ func GetAnnoncePrefByID(c *gin.Context) {
 		return
 	}
 
-	var prefinancements models.AnnoncePrefinancement
-	if err := database.DB.First(&prefinancements, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Annonce_achat non trouvée"})
+	var annonce models.AnnoncePrefinancement
+	if err := database.DB.Preload("User").Preload("Parcelle").Preload("TypeCulture").First(&annonce, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Annonce non trouvée"})
 		return
 	}
 
-	c.JSON(http.StatusOK, prefinancements)
+	result := models.LiteAnnoncePrefinancement{
+		ID:                 annonce.ID.String(),
+		Statut:             annonce.Statut,
+		Description:        annonce.Description,
+		MontantPref:        annonce.MontantPrefinancement,
+		PrixKgPref:         annonce.Prix,
+		Quantite:           annonce.Quantite,
+		UserNom:            annonce.User.Nom,
+		TypeCultureLibelle: annonce.TypeCulture.Libelle,
+		ParcelleAdresse:    annonce.Parcelle.Adresse,
+		ParcelleSuf:        annonce.Parcelle.Surface,
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
-// Modifier une annonce existante
+// 🔹 Modifier une annonce existante
 func UpdateAnnoncePref(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := uuid.Parse(idParam)
@@ -107,44 +200,78 @@ func UpdateAnnoncePref(c *gin.Context) {
 		return
 	}
 
-	//Récupération de l’annonce existante
-	var prefinancements models.AnnoncePrefinancement
-	if err := database.DB.First(&prefinancements, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Annonce_chat non trouvée"})
+	var annonce models.AnnoncePrefinancement
+	if err := database.DB.First(&annonce, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Annonce non trouvée"})
 		return
 	}
 
-	//Mise à jour avec les données entrantes
-	var updatedAnnonce models.AnnoncePrefinancement
-	if err := c.ShouldBindJSON(&updatedAnnonce); err != nil {
+	var input models.AnnoncePrefinancement
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Requête invalide : " + err.Error()})
 		return
 	}
 
-	//Mise à jour individuel
-	prefinancements.Statut = updatedAnnonce.Statut
-	prefinancements.Montant = updatedAnnonce.Montant
-	prefinancements.Description = updatedAnnonce.Description
-
-	if err := database.DB.Save(&prefinancements).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la mise à jour : " + err.Error()})
+	// Vérifie l'existence des entités liées
+	var tc models.TypeCulture
+	if err := database.DB.First(&tc, "id = ?", input.TypeCultureID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Type de culture introuvable"})
+		return
+	}
+	var parcelle models.Parcelle
+	if err := database.DB.First(&parcelle, "id = ?", input.ParcelleID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Parcelle introuvable"})
+		return
+	}
+	var user models.User
+	if err := database.DB.First(&user, "id = ?", input.UserID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Utilisateur introuvable"})
 		return
 	}
 
-	c.JSON(http.StatusOK, prefinancements)
+	annonce.Statut = input.Statut
+	annonce.Description = input.Description
+	annonce.Quantite = input.Quantite
+	annonce.Prix = input.Prix
+	annonce.TypeCultureID = input.TypeCultureID
+	annonce.ParcelleID = input.ParcelleID
+	annonce.UserID = input.UserID
+	annonce.MontantPrefinancement = input.Prix * input.Quantite
+
+	if err := database.DB.Save(&annonce).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur mise à jour : " + err.Error()})
+		return
+	}
+
+	database.DB.Preload("User").Preload("Parcelle").Preload("TypeCulture").First(&annonce)
+
+	result := models.LiteAnnoncePrefinancement{
+		ID:                 annonce.ID.String(),
+		Statut:             annonce.Statut,
+		Description:        annonce.Description,
+		MontantPref:        annonce.MontantPrefinancement,
+		PrixKgPref:         annonce.Prix,
+		Quantite:           annonce.Quantite,
+		UserNom:            user.Nom,
+		TypeCultureLibelle: annonce.TypeCulture.Libelle,
+		ParcelleAdresse:    annonce.Parcelle.Adresse,
+		ParcelleSuf:        annonce.Parcelle.Surface,
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
-// Suppression d'une annonce par son ID
+// 🔹 Supprimer une annonce
 func DeleteAnnoncePref(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := uuid.Parse(idParam)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "L'identifant est invalide"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID invalide"})
 		return
 	}
 
 	if err := database.DB.Delete(&models.AnnoncePrefinancement{}, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la suppression : " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur suppression : " + err.Error()})
 		return
 	}
 

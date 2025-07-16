@@ -8,6 +8,7 @@ import (
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 var DB *gorm.DB
@@ -33,8 +34,10 @@ func InitDB() {
 	// Connexion avec désactivation du protocole préparé
 	DB, err = gorm.Open(postgres.New(postgres.Config{
 		DSN:                  dsn,
-		PreferSimpleProtocol: true, // ✅ IMPORTANT : désactive les requêtes préparées
-	}), &gorm.Config{})
+		PreferSimpleProtocol: true, //  IMPORTANT : désactive les requêtes préparées
+	}), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+	})
 
 	if err != nil {
 		log.Fatal("Erreur de connexion à la base de données :", err)
