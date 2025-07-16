@@ -64,7 +64,19 @@ func CreateAnnonceVente(c *gin.Context) {
 	annonce.Description = c.PostForm("description")
 	annonce.UserID, _ = uuid.Parse(c.PostForm("user_id"))
 	annonce.TypeCultureID, _ = uuid.Parse(c.PostForm("type_culture_id"))
-	annonce.ParcelleID, _ = uuid.Parse(c.PostForm("parcelle_id"))
+	parcelleIDStr := c.PostForm("parcelle_id")
+	parcelleID, err := uuid.Parse(parcelleIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ParcelleID invalide"})
+		return
+	}
+	annonce.ParcelleID = parcelleID
+	var parcelle models.Parcelle
+	if err := database.DB.First(&parcelle, "id = ?", parcelleID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Parcelle introuvable"})
+		return
+	}
+
 	quantiteStr := c.PostForm("quantite")
 	quantite, err := strconv.ParseFloat(quantiteStr, 64)
 	if err != nil {
@@ -153,7 +165,21 @@ func UpdateAnnonceVente(c *gin.Context) {
 	annonce.Statut = c.PostForm("statut")
 	annonce.Description = c.PostForm("description")
 	annonce.TypeCultureID, _ = uuid.Parse(c.PostForm("type_culture_id"))
-	annonce.ParcelleID, _ = uuid.Parse(c.PostForm("parcelle_id"))
+	parcelleIDStr := c.PostForm("parcelle_id")
+	parcelleID, err := uuid.Parse(parcelleIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ParcelleID invalide"})
+		return
+	}
+	annonce.ParcelleID = parcelleID
+
+	// Vérifie que la parcelle existe
+	var parcelle models.Parcelle
+	if err := database.DB.First(&parcelle, "id = ?", parcelleID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Parcelle introuvable"})
+		return
+	}
+
 	annonce.Quantite, _ = strconv.ParseFloat(c.PostForm("quantite"), 64)
 	annonce.PrixKg, _ = strconv.ParseFloat(c.PostForm("prix_kg"), 64)
 

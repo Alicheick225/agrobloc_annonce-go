@@ -15,7 +15,6 @@ func GetAllAnnoncePref(c *gin.Context) {
 	var annonces []models.AnnoncePrefinancement
 	query := database.DB.Preload("User").Preload("TypeCulture").Preload("Parcelle")
 
-	// Filtres facultatifs
 	if userID := c.Query("user_id"); userID != "" {
 		query = query.Where("user_id = ?", userID)
 	}
@@ -26,7 +25,6 @@ func GetAllAnnoncePref(c *gin.Context) {
 		query = query.Where("type_culture_id = ?", typeCultureID)
 	}
 
-	// ❗ Cette ligne manquait !
 	if err := query.Find(&annonces).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -55,11 +53,9 @@ func GetAllAnnoncePref(c *gin.Context) {
 func CreateAnnoncePref(c *gin.Context) {
 	var annonce models.AnnoncePrefinancement
 
-	// ✅ Récupération et validation des champs texte
 	annonce.Statut = c.PostForm("statut")
 	annonce.Description = c.PostForm("description")
 
-	// ✅ Parsing et validation des UUID
 	userID, err := uuid.Parse(c.PostForm("user_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID utilisateur invalide"})
@@ -79,7 +75,6 @@ func CreateAnnoncePref(c *gin.Context) {
 	annonce.TypeCultureID = typeCultureID
 	annonce.ParcelleID = parcelleID
 
-	// ✅ Vérification existence des entités liées
 	var tc models.TypeCulture
 	if err := database.DB.First(&tc, "id = ?", typeCultureID).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Type de culture introuvable"})
@@ -96,7 +91,6 @@ func CreateAnnoncePref(c *gin.Context) {
 		return
 	}
 
-	// ✅ Conversion des nombres
 	qStr := c.PostForm("quantite")
 	pStr := c.PostForm("prix")
 	quantite, err := strconv.ParseFloat(qStr, 64)
@@ -112,20 +106,14 @@ func CreateAnnoncePref(c *gin.Context) {
 	annonce.Quantite = quantite
 	annonce.Prix = prix
 	annonce.MontantPrefinancement = prix * quantite
-
-	// ✅ Génération de l’UUID
 	annonce.ID = uuid.New()
 
-	// ✅ Enregistrement
 	if err := database.DB.Create(&annonce).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur création : " + err.Error()})
 		return
 	}
-
-	// ✅ Préchargement avec les relations
 	database.DB.Preload("User").Preload("Parcelle").Preload("TypeCulture").First(&annonce)
 
-	// ✅ Retour
 	result := models.LiteAnnoncePrefinancement{
 		ID:                 annonce.ID.String(),
 		Statut:             annonce.Statut,
@@ -142,7 +130,7 @@ func CreateAnnoncePref(c *gin.Context) {
 	c.JSON(http.StatusCreated, result)
 }
 
-// Récupérer les annonces d’un utilisateur
+// 🔹 Récupérer les annonces d’un utilisateur
 func GetPrefinancementsByUserID(c *gin.Context) {
 	userIDParam := c.Param("user_id")
 	userID, err := uuid.Parse(userIDParam)
@@ -212,7 +200,6 @@ func UpdateAnnoncePref(c *gin.Context) {
 		return
 	}
 
-	// Vérifie l'existence des entités liées
 	var tc models.TypeCulture
 	if err := database.DB.First(&tc, "id = ?", input.TypeCultureID).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Type de culture introuvable"})
