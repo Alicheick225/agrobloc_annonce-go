@@ -17,6 +17,10 @@ type AnnonceAchat struct {
 	// UpdatedAt time.Time `json:"updated_at"`
 
 	// CreatedAt omitted for now
+
+	User        User        `json:"users" gorm:"foreignKey:UserID"`
+	TypeCulture TypeCulture `json:"type_culture" gorm:"foreignKey:TypeCultureID"`
+	Parcelle    Parcelle    `json:"parcelle" gorm:"foreignKey:ParcelleID"`
 }
 
 func (AnnonceAchat) TableName() string {

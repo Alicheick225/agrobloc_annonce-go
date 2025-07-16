@@ -5,30 +5,25 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	
+
 	"github.com/Steph-business/annonce_de_vente/database"
 	"github.com/Steph-business/annonce_de_vente/models"
 )
 
-//Liste toutes les annonces avec filtres facultatifs
+// Liste toutes les annonces avec filtres facultatifs
 func GetAllAnnonceAchat(c *gin.Context) {
 	var achats []models.AnnonceAchat
 
-	// Récupérer les filtres
-	userID := c.Query("user_id")
-	statut := c.Query("statut")
-	typeCultureID := c.Query("type_culture_id")
-
 	// Construire la requête dynamique
-	query := database.DB
+	query := database.DB.Preload("TypeCulture").Preload("User")
 
-	if userID != "" {
+	if userID := c.Query("user_id"); userID != "" {
 		query = query.Where("user_id = ?", userID)
 	}
-	if statut != "" {
+	if statut := c.Query("statut"); statut != "" {
 		query = query.Where("statut = ?", statut)
 	}
-	if typeCultureID != "" {
+	if typeCultureID := c.Query("type_culture_id"); typeCultureID != "" {
 		query = query.Where("type_culture_id = ?", typeCultureID)
 	}
 
@@ -38,7 +33,19 @@ func GetAllAnnonceAchat(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, achats)
+	var result []models.LiteAnnoncePrefinancement
+	for _, a := range achats {
+		result = append(result, models.LiteAnnoncePrefinancement{
+			ID:                 a.ID.String(),
+			Statut:             a.Statut,
+			Description:        a.Description,
+			Quantite:           a.Quantite,
+			UserNom:            a.User.Nom,
+			TypeCultureLibelle: a.TypeCulture.Libelle,
+		})
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // 🔹 Afficher toutes les annonces d'achat d'un utilisateur
@@ -61,9 +68,7 @@ func GetAnnoncesAchatByUserID(c *gin.Context) {
 	c.JSON(http.StatusOK, annonces)
 }
 
-
-
-//Créer une nouvelle annonce_achat
+// Créer une nouvelle annonce_achat
 func CreateAnnonceAchat(c *gin.Context) {
 	var achats models.AnnonceAchat
 	if err := c.ShouldBindJSON(&achats); err != nil {
@@ -82,7 +87,7 @@ func CreateAnnonceAchat(c *gin.Context) {
 	c.JSON(http.StatusCreated, achats)
 }
 
-//Récupération d'une annonce par son Identifiant
+// Récupération d'une annonce par son Identifiant
 func GetAnnonceAchatByID(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := uuid.Parse(idParam)
@@ -100,8 +105,7 @@ func GetAnnonceAchatByID(c *gin.Context) {
 	c.JSON(http.StatusOK, achats)
 }
 
-
-//  Modifier une annonce existante
+// Modifier une annonce existante
 func UpdateAnnonceAchat(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := uuid.Parse(idParam)
@@ -136,9 +140,7 @@ func UpdateAnnonceAchat(c *gin.Context) {
 	c.JSON(http.StatusOK, achats)
 }
 
-
-
-//Suppression d'une annonce par son ID
+// Suppression d'une annonce par son ID
 func DeleteAnnonceAchat(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := uuid.Parse(idParam)
@@ -154,4 +156,3 @@ func DeleteAnnonceAchat(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Annonce supprimée avec succès"})
 }
-
