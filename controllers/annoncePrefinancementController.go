@@ -92,20 +92,22 @@ func CreateAnnoncePref(c *gin.Context) {
 	}
 
 	qStr := c.PostForm("quantite")
-	pStr := c.PostForm("prix")
+
 	quantite, err := strconv.ParseFloat(qStr, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Quantité invalide"})
 		return
 	}
-	prix, err := strconv.ParseFloat(pStr, 64)
+	prixKgStr := c.PostForm("prix")
+	prixKg, err := strconv.ParseFloat(prixKgStr, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Prix invalide"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Prix par kg invalide"})
 		return
 	}
+	annonce.Prix = prixKg
 	annonce.Quantite = quantite
-	annonce.Prix = prix
-	annonce.MontantPrefinancement = prix * quantite
+
+	annonce.MontantPrefinancement = prixKg * quantite
 	annonce.ID = uuid.New()
 
 	if err := database.DB.Create(&annonce).Error; err != nil {

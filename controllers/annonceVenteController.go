@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -24,6 +25,30 @@ func toAnnonceDTO(a models.AnnonceVente) models.ListeAnnonceVente {
 		TypeCultureLibelle: a.TypeCulture.Libelle,
 		ParcelleAdresse:    a.Parcelle.Adresse,
 	}
+}
+
+// validateParcelleID vérifie que le parcelleID est non vide, valide et existe en base
+func validateParcelleID(c *gin.Context, parcelleIDStr string) (uuid.UUID, bool) {
+	if parcelleIDStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ParcelleID manquant"})
+		log.Println("Validation ParcelleID échouée : champ vide")
+		return uuid.Nil, false
+	}
+	log.Printf("Validation ParcelleID : valeur reçue '%s'\n", parcelleIDStr)
+	parcelleID, err := uuid.Parse(parcelleIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ParcelleID invalide"})
+		log.Printf("Validation ParcelleID échouée : parsing UUID invalide pour %s\n", parcelleIDStr)
+		return uuid.Nil, false
+	}
+	var parcelle models.Parcelle
+	if err := database.DB.First(&parcelle, "id = ?", parcelleID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Parcelle introuvable"})
+		log.Printf("Validation ParcelleID échouée : parcelle introuvable pour ID %s\n", parcelleID.String())
+		return uuid.Nil, false
+	}
+	log.Printf("Validation ParcelleID réussie pour ID %s\n", parcelleID.String())
+	return parcelleID, true
 }
 
 // Liste toutes les annonces avec filtres facultatifs
@@ -65,17 +90,11 @@ func CreateAnnonceVente(c *gin.Context) {
 	annonce.UserID, _ = uuid.Parse(c.PostForm("user_id"))
 	annonce.TypeCultureID, _ = uuid.Parse(c.PostForm("type_culture_id"))
 	parcelleIDStr := c.PostForm("parcelle_id")
-	parcelleID, err := uuid.Parse(parcelleIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ParcelleID invalide"})
+	parcelleID, ok := validateParcelleID(c, parcelleIDStr)
+	if !ok {
 		return
 	}
 	annonce.ParcelleID = parcelleID
-	var parcelle models.Parcelle
-	if err := database.DB.First(&parcelle, "id = ?", parcelleID).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Parcelle introuvable"})
-		return
-	}
 
 	quantiteStr := c.PostForm("quantite")
 	quantite, err := strconv.ParseFloat(quantiteStr, 64)
@@ -166,19 +185,11 @@ func UpdateAnnonceVente(c *gin.Context) {
 	annonce.Description = c.PostForm("description")
 	annonce.TypeCultureID, _ = uuid.Parse(c.PostForm("type_culture_id"))
 	parcelleIDStr := c.PostForm("parcelle_id")
-	parcelleID, err := uuid.Parse(parcelleIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ParcelleID invalide"})
+	parcelleID, ok := validateParcelleID(c, parcelleIDStr)
+	if !ok {
 		return
 	}
 	annonce.ParcelleID = parcelleID
-
-	// Vérifie que la parcelle existe
-	var parcelle models.Parcelle
-	if err := database.DB.First(&parcelle, "id = ?", parcelleID).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Parcelle introuvable"})
-		return
-	}
 
 	annonce.Quantite, _ = strconv.ParseFloat(c.PostForm("quantite"), 64)
 	annonce.PrixKg, _ = strconv.ParseFloat(c.PostForm("prix_kg"), 64)
