@@ -73,7 +73,6 @@ type CreateAnnonceAchatInput struct {
 	Statut        string  `json:"statut" binding:"required"`
 	Prix          float64 `json:"prix_kg" binding:"required"`
 	Description   string  `json:"description" binding:"required"`
-	UserID        string  `json:"user_id" binding:"required"`
 	TypeCultureID string  `json:"type_culture_id" binding:"required"`
 	Quantite      float64 `json:"quantite" binding:"required"`
 }
@@ -87,11 +86,6 @@ func CreateAnnonceAchat(c *gin.Context) {
 		return
 	}
 
-	userID, err := uuid.Parse(input.UserID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID utilisateur invalide"})
-		return
-	}
 	typeCultureID, err := uuid.Parse(input.TypeCultureID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID type culture invalide"})
@@ -103,7 +97,6 @@ func CreateAnnonceAchat(c *gin.Context) {
 		Statut:        input.Statut,
 		Prix:          input.Prix,
 		Description:   input.Description,
-		UserID:        userID,
 		TypeCultureID: typeCultureID,
 		Quantite:      input.Quantite,
 	}
@@ -163,7 +156,6 @@ type UpdateAnnonceAchatInput struct {
 	Statut        string  `json:"statut" binding:"required"`
 	Prix          float64 `json:"prix_kg" binding:"required"`
 	Description   string  `json:"description" binding:"required"`
-	UserID        string  `json:"user_id" binding:"required"`
 	TypeCultureID string  `json:"type_culture_id" binding:"required"`
 	Quantite      float64 `json:"quantite" binding:"required"`
 }
