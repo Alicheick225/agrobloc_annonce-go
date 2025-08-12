@@ -11,6 +11,7 @@ type AnnonceAchat struct {
 	UserID        uuid.UUID `json:"user_id" gorm:"type:uuid"`
 	TypeCultureID uuid.UUID `json:"type_culture_id" gorm:"type:uuid"`
 	Statut        string    `json:"statut"`
+	Prix          float64   `json:"prix_kg" gorm:"column:prix_kg"`
 	Description   string    `json:"description"`
 	Quantite      float64   `json:"quantite"`
 	CreatedAt     time.Time `json:"cree_at"`

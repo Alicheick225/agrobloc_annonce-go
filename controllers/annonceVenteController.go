@@ -27,23 +27,24 @@ func toAnnonceDTO(a models.AnnonceVente) models.ListeAnnonceVente {
 	}
 }
 
-// validateParcelleID vérifie que le parcelleID est non vide, valide et existe en base
+// validateParcelleID vérifie que le parcelleID est valide et existe en base
+// Returns true if parcelleID is valid or empty (for optional updates)
 func validateParcelleID(c *gin.Context, parcelleIDStr string) (uuid.UUID, bool) {
 	if parcelleIDStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ParcelleID manquant"})
-		log.Println("Validation ParcelleID échouée : champ vide")
-		return uuid.Nil, false
+		// Allow empty ParcelleID - will use existing value
+		return uuid.Nil, true
 	}
+
 	log.Printf("Validation ParcelleID : valeur reçue '%s'\n", parcelleIDStr)
 	parcelleID, err := uuid.Parse(parcelleIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ParcelleID invalide"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ParcelleID invalide - format UUID attendu"})
 		log.Printf("Validation ParcelleID échouée : parsing UUID invalide pour %s\n", parcelleIDStr)
 		return uuid.Nil, false
 	}
 	var parcelle models.Parcelle
 	if err := database.DB.First(&parcelle, "id = ?", parcelleID).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Parcelle introuvable"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Parcelle introuvable avec l'ID fourni"})
 		log.Printf("Validation ParcelleID échouée : parcelle introuvable pour ID %s\n", parcelleID.String())
 		return uuid.Nil, false
 	}
@@ -80,65 +81,77 @@ func GetAllAnnonceVente(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+type CreateAnnonceVenteInput struct {
+	Statut        string `json:"statut" binding:"required"`
+	Description   string `json:"description" binding:"required"`
+	UserID        string `json:"user_id" binding:"required"`
+	TypeCultureID string `json:"type_culture_id" binding:"required"`
+	ParcelleID    string `json:"parcelle_id" binding:"required"`
+	Quantite      string `json:"quantite" binding:"required"`
+	PrixKg        string `json:"prix_kg" binding:"required"`
+	Photo         string `json:"photo"` // Optional, handle separately if needed
+}
+
 // Créer une nouvelle annonce
 func CreateAnnonceVente(c *gin.Context) {
-	var annonce models.AnnonceVente
+	var input CreateAnnonceVenteInput
 
-	// Récupère les champs du formulaire
-	annonce.Statut = c.PostForm("statut")
-	annonce.Description = c.PostForm("description")
-	annonce.UserID, _ = uuid.Parse(c.PostForm("user_id"))
-	annonce.TypeCultureID, _ = uuid.Parse(c.PostForm("type_culture_id"))
-	parcelleIDStr := c.PostForm("parcelle_id")
-	parcelleID, ok := validateParcelleID(c, parcelleIDStr)
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Données JSON invalides ou manquantes"})
+		return
+	}
+
+	userID, err := uuid.Parse(input.UserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID utilisateur invalide"})
+		return
+	}
+	typeCultureID, err := uuid.Parse(input.TypeCultureID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID type culture invalide"})
+		return
+	}
+	parcelleID, err := uuid.Parse(input.ParcelleID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID parcelle invalide"})
+		return
+	}
+
+	// Validate parcelle existence
+	_, ok := validateParcelleID(c, input.ParcelleID)
 	if !ok {
 		return
 	}
-	annonce.ParcelleID = parcelleID
 
-	quantiteStr := c.PostForm("quantite")
-	quantite, err := strconv.ParseFloat(quantiteStr, 64)
+	quantite, err := strconv.ParseFloat(input.Quantite, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Quantité invalide"})
 		return
 	}
-	annonce.Quantite = quantite
 
-	prixKgStr := c.PostForm("prix_kg")
-	prixKg, err := strconv.ParseFloat(prixKgStr, 64)
+	prixKg, err := strconv.ParseFloat(input.PrixKg, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Prix par kg invalide"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Prix au kg invalide"})
 		return
 	}
-	annonce.PrixKg = prixKg
 
-	// Gérer l'image
-	file, err := c.FormFile("photo")
-	if err == nil {
-		// Génère un nom de fichier unique
-		filename := file.Filename
-		filepath := "static/" + filename
-
-		// Sauvegarde le fichier sur le disque
-		if err := c.SaveUploadedFile(file, filepath); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur de sauvegarde de l'image : " + err.Error()})
-			return
-		}
-
-		// Enregistre le chemin d’accès
-		annonce.Photo = "" + filepath
+	annonce := models.AnnonceVente{
+		ID:            uuid.New(),
+		Statut:        input.Statut,
+		Description:   input.Description,
+		UserID:        userID,
+		TypeCultureID: typeCultureID,
+		ParcelleID:    parcelleID,
+		Quantite:      quantite,
+		PrixKg:        prixKg,
+		Photo:         input.Photo,
 	}
 
-	// ID unique
-	annonce.ID = uuid.New()
-
-	// Enregistrement
 	if err := database.DB.Create(&annonce).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur création : " + err.Error()})
 		return
 	}
 
-	// Recharge avec relations
 	database.DB.Preload("User").Preload("TypeCulture").Preload("Parcelle").First(&annonce)
 	result := toAnnonceDTO(annonce)
 
@@ -180,34 +193,68 @@ func UpdateAnnonceVente(c *gin.Context) {
 		return
 	}
 
-	// Mise à jour des champs (form-data)
-	annonce.Statut = c.PostForm("statut")
-	annonce.Description = c.PostForm("description")
-	annonce.TypeCultureID, _ = uuid.Parse(c.PostForm("type_culture_id"))
-	parcelleIDStr := c.PostForm("parcelle_id")
-	parcelleID, ok := validateParcelleID(c, parcelleIDStr)
-	if !ok {
+	// Structure pour recevoir les données JSON
+	var input struct {
+		Statut        string `json:"statut"`
+		Description   string `json:"description"`
+		TypeCultureID string `json:"type_culture_id"`
+		ParcelleID    string `json:"parcelle_id"`
+		Quantite      string `json:"quantite"`
+		PrixKg        string `json:"prix_kg"`
+		Photo         string `json:"photo"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Données JSON invalides ou manquantes"})
 		return
 	}
-	annonce.ParcelleID = parcelleID
 
-	annonce.Quantite, _ = strconv.ParseFloat(c.PostForm("quantite"), 64)
-	annonce.PrixKg, _ = strconv.ParseFloat(c.PostForm("prix_kg"), 64)
+	// Log the received payload for debugging
+	log.Printf("Update request payload: %+v", input)
 
-	// Vérifie si une nouvelle image est envoyée
-	file, err := c.FormFile("photo")
-	if err == nil {
-		// Génère un nom de fichier
-		filename := file.Filename
-		filepath := "static/" + filename
-
-		if err := c.SaveUploadedFile(file, filepath); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur upload image : " + err.Error()})
+	// Mise à jour des champs si fournis
+	if input.Statut != "" {
+		annonce.Statut = input.Statut
+	}
+	if input.Description != "" {
+		annonce.Description = input.Description
+	}
+	if input.TypeCultureID != "" {
+		typeCultureID, err := uuid.Parse(input.TypeCultureID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID type culture invalide"})
 			return
 		}
-
-		// Remplace le chemin image
-		annonce.Photo = "" + filepath
+		annonce.TypeCultureID = typeCultureID
+	}
+	if input.ParcelleID != "" {
+		parcelleID, ok := validateParcelleID(c, input.ParcelleID)
+		if !ok {
+			return
+		}
+		// Only update if a valid parcelleID was provided
+		if parcelleID != uuid.Nil {
+			annonce.ParcelleID = parcelleID
+		}
+	}
+	if input.Quantite != "" {
+		quantite, err := strconv.ParseFloat(input.Quantite, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Quantité invalide"})
+			return
+		}
+		annonce.Quantite = quantite
+	}
+	if input.PrixKg != "" {
+		prixKg, err := strconv.ParseFloat(input.PrixKg, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Prix au kg invalide"})
+			return
+		}
+		annonce.PrixKg = prixKg
+	}
+	if input.Photo != "" {
+		annonce.Photo = input.Photo
 	}
 
 	// Sauvegarde

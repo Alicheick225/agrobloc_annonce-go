@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/Steph-business/annonce_de_vente/database"
 	"github.com/Steph-business/annonce_de_vente/models"
@@ -49,31 +48,41 @@ func GetAllAnnoncePref(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+
+type CreateAnnoncePrefInput struct {
+	Statut        string  `json:"statut" binding:"required"`
+	Description   string  `json:"description" binding:"required"`
+	UserID        string  `json:"user_id" binding:"required"`
+	TypeCultureID string  `json:"type_culture_id" binding:"required"`
+	ParcelleID    string  `json:"parcelle_id" binding:"required"`
+	Quantite      float64 `json:"quantite" binding:"required"`
+	Prix         float64 `json:"prix" binding:"required"`
+}
+
 // Créer une nouvelle annonce de préfinancement
 func CreateAnnoncePref(c *gin.Context) {
-	var annonce models.AnnoncePrefinancement
+	var input CreateAnnoncePrefInput
 
-	annonce.Statut = c.PostForm("statut")
-	annonce.Description = c.PostForm("description")
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Données JSON invalides ou manquantes"})
+		return
+	}
 
-	userID, err := uuid.Parse(c.PostForm("user_id"))
+	userID, err := uuid.Parse(input.UserID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID utilisateur invalide"})
 		return
 	}
-	typeCultureID, err := uuid.Parse(c.PostForm("type_culture_id"))
+	typeCultureID, err := uuid.Parse(input.TypeCultureID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID type culture invalide"})
 		return
 	}
-	parcelleID, err := uuid.Parse(c.PostForm("parcelle_id"))
+	parcelleID, err := uuid.Parse(input.ParcelleID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID parcelle invalide"})
 		return
 	}
-	annonce.UserID = userID
-	annonce.TypeCultureID = typeCultureID
-	annonce.ParcelleID = parcelleID
 
 	var tc models.TypeCulture
 	if err := database.DB.First(&tc, "id = ?", typeCultureID).Error; err != nil {
@@ -91,28 +100,22 @@ func CreateAnnoncePref(c *gin.Context) {
 		return
 	}
 
-	qStr := c.PostForm("quantite")
-
-	quantite, err := strconv.ParseFloat(qStr, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Quantité invalide"})
-		return
-	}
-	prixKgStr := c.PostForm("prix")
-	prixKg, err := strconv.ParseFloat(prixKgStr, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Prix par kg invalide"})
-		return
-	}
-	if prixKg <= 0 {
+	if input.Prix <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Prix par kg doit être supérieur à zéro"})
 		return
 	}
-	annonce.Prix = prixKg
-	annonce.Quantite = quantite
 
-	annonce.MontantPrefinancement = prixKg * quantite
-	annonce.ID = uuid.New()
+	annonce := models.AnnoncePrefinancement{
+		ID:                   uuid.New(),
+		Statut:               input.Statut,
+		Description:          input.Description,
+		UserID:               userID,
+		TypeCultureID:        typeCultureID,
+		ParcelleID:           parcelleID,
+		Quantite:             input.Quantite,
+		Prix:                 input.Prix,
+		MontantPrefinancement: input.Prix * input.Quantite,
+	}
 
 	if err := database.DB.Create(&annonce).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur création : " + err.Error()})

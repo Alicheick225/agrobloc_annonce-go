@@ -3,12 +3,15 @@ package models
 import "github.com/google/uuid"
 
 type User struct {
-	ID  uuid.UUID `json:"id" gorm:"type:uuid"`
+	ID  uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
 	Nom string    `json:"nom"`
+	// Email    string    `json:"email" gorm:"uniqueIndex"`
+	// Phone    float64    `json:"numero_tel" gorm:"uniqueIndex"`
+	// Password string    `json:"-"`
 }
 
 func (User) TableName() string {
-	return "users" // Correspond à la table dans la base de données
+	return "users"
 }
 
 type TypeCulture struct {
@@ -17,7 +20,7 @@ type TypeCulture struct {
 }
 
 func (TypeCulture) TableName() string {
-	return "type_culture" //  Correspond à la table dans la base de données
+	return "type_culture"
 }
 
 type Parcelle struct {
@@ -27,5 +30,5 @@ type Parcelle struct {
 }
 
 func (Parcelle) TableName() string {
-	return "parcelle" //  Correspond à la table dans la base de données
+	return "parcelle"
 }

@@ -9,5 +9,5 @@ func main() {
 	database.InitDB()
 	r := routes.SetupRoutes()
 	r.Static("/static", "./uploads")
-	r.Run("0.0.0.0:8080")
+	r.Run("0.0.0.0:8081")
 }
