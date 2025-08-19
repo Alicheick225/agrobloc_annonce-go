@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/Steph-business/annonce_de_vente/database"
@@ -52,7 +53,6 @@ func GetAllAnnoncePref(c *gin.Context) {
 type CreateAnnoncePrefInput struct {
 	Statut        string  `json:"statut" binding:"required"`
 	Description   string  `json:"description" binding:"required"`
-	UserID        string  `json:"user_id" binding:"required"`
 	TypeCultureID string  `json:"type_culture_id" binding:"required"`
 	ParcelleID    string  `json:"parcelle_id" binding:"required"`
 	Quantite      float64 `json:"quantite" binding:"required"`
@@ -68,7 +68,15 @@ func CreateAnnoncePref(c *gin.Context) {
 		return
 	}
 
-	userID, err := uuid.Parse(input.UserID)
+	// Récupérer l'ID utilisateur depuis le contexte (mis par le middleware)
+	userIDFloat, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Utilisateur non authentifié"})
+		return
+	}
+
+	// Convertir l'ID utilisateur en UUID
+	userID, err := uuid.Parse(fmt.Sprintf("%.0f", userIDFloat))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID utilisateur invalide"})
 		return

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -92,8 +93,23 @@ func CreateAnnonceAchat(c *gin.Context) {
 		return
 	}
 
+	// Récupérer l'ID utilisateur depuis le contexte (mis par le middleware)
+	userIDFloat, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Utilisateur non authentifié"})
+		return
+	}
+
+	// Convertir l'ID utilisateur en UUID
+	userID, err := uuid.Parse(fmt.Sprintf("%.0f", userIDFloat))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID utilisateur invalide"})
+		return
+	}
+
 	achats := models.AnnonceAchat{
 		ID:            uuid.New(),
+		UserID:        userID,
 		Statut:        input.Statut,
 		Prix:          input.Prix,
 		Description:   input.Description,
